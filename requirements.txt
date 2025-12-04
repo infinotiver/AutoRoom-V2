@@ -1,0 +1,6 @@
+pigpio
+flask
+adafruit-circuitpython-ssd1306
+adafruit-circuitpython-dht
+pillow
+adafruit-blinka

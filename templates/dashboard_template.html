@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>People Counter Dashboard</title>
+
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Material Icons (svg) -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg1: #0f1720;      /* dark navy */
+      --bg2: #0b1220;      /* darker gradient */
+      --card: #0f1725;
+      --muted: #bfc9d6;
+      --accent: #22c55e;
+      --accent-2: #7c3aed;
+      --glass: rgba(255,255,255,0.03);
+      --gap: 16px;
+      --radius: 12px;
+      --max-width: 1200px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
+      color: #e6eef6;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      padding:28px;
+    }
+
+    /* shell */
+    .shell{
+      width:100%;
+      max-width:var(--max-width);
+      display:flex;
+      flex-direction:column;
+      gap:var(--gap);
+    }
+
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    header .title{
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+    h1{
+      margin:0;
+      font-size:1.15rem;
+      font-weight:700;
+      color:#ffffff;
+      letter-spacing:0.2px;
+    }
+    .subtitle{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    /* controls */
+    .controls{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .btn{
+      appearance:none;
+      border:0;
+      padding:8px 12px;
+      border-radius:9px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:0.95rem;
+      transition:transform .08s ease, box-shadow .08s ease;
+      box-shadow: 0 2px 8px rgba(2,6,23,0.5);
+      color:#071014;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn-increase{background:linear-gradient(180deg,var(--accent), #10b154); min-width:106px}
+    .btn-decrease{background:#1f2937; color:var(--muted); min-width:106px}
+
+    /* cards grid (Home Assistant style) */
+    .grid {
+      display:grid;
+      gap:12px;
+      grid-template-columns:repeat(3, minmax(0,1fr));
+      align-items:stretch;
+    }
+
+    .stat-card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.04);
+      backdrop-filter: blur(6px);
+      padding:14px;
+      border-radius:var(--radius);
+      display:flex;
+      gap:12px;
+      align-items:center;
+      min-height:86px;
+      box-shadow: 0 6px 18px rgba(2,6,23,0.45);
+    }
+
+    .icon {
+      width:52px;
+      height:52px;
+      border-radius:10px;
+      background:var(--glass);
+      display:grid;
+      place-items:center;
+      flex-shrink:0;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .icon .material-icons { font-size:28px; color:var(--accent); }
+
+    .stat-body{
+      flex:1;
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+    }
+    .stat-label{
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .stat-value{
+      font-size:1.15rem;
+      font-weight:700;
+      color:#fff;
+      display:flex;
+      align-items:baseline;
+      gap:8px;
+    }
+    .stat-value small{
+      font-size:0.75rem;
+      font-weight:600;
+      color:var(--muted);
+    }
+    .stat-meta{
+      font-size:11px;
+      color:#98a6b8;
+      margin-top:6px;
+    }
+
+    /* charts area */
+    .charts {
+      display:flex;
+      gap:12px;
+      align-items:stretch;
+    }
+    .chart-wrap{
+      flex:1 1 0;
+      min-width:0;
+      border-radius:var(--radius);
+      overflow:hidden;
+      background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(255,255,255,0.02));
+      border:1px solid rgba(255,255,255,0.03);
+      padding:12px;
+      box-shadow: 0 8px 30px rgba(2,6,23,0.45);
+    }
+    /* fix canvas overflow: use fixed container height; Chart.js will fit */
+    .chart-canvas{
+      width:100%;
+      height:260px;
+      display:block;
+    }
+
+    /* footer small info */
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      justify-content:space-between;
+    }
+
+    /* responsive */
+    @media (max-width:1000px){
+      .grid{grid-template-columns:repeat(2, minmax(0,1fr))}
+      .chart-canvas{height:220px}
+    }
+    @media (max-width:620px){
+      header{flex-direction:column; align-items:flex-start}
+      .grid{grid-template-columns:repeat(1, minmax(0,1fr))}
+      .charts{flex-direction:column}
+      .chart-canvas{height:180px}
+    }
+    /* Small utility styles for compact controls inside stat-cards */
+    .card-controls{display:flex;align-items:center;gap:8px}
+    .card-controls input[type="text"], .card-controls input[type="number"]{max-width:240px; min-width:84px}
+    .btn-small{padding:6px 10px; font-size:0.9rem}
+    /* Ensure stat-value allows multi-line small meta content */
+    .stat-value{flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <header>
+      <div class="title">
+        <h1>People Counter Dashboard</h1>
+        <div class="subtitle">Live occupancy and energy overview</div>
+      </div>
+
+      <div class="controls">
+        <form method="post" style="margin:0;display:inline-flex;gap:8px;">
+          <button class="btn btn-increase" name="increase" type="submit">
+            <span class="material-icons" style="vertical-align:middle">person_add</span> Increase
+          </button>
+          <button class="btn btn-decrease" name="decrease" type="submit">
+            <span class="material-icons" style="vertical-align:middle">person_remove</span> Decrease
+          </button>
+        </form>
+      </div>
+    </header>
+
+    <!-- stats grid -->
+    <section class="grid" aria-label="Statistics">
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons">groups</span></div>
+        <div class="stat-body">
+          <div class="stat-label">People Count</div>
+          <div class="stat-value"><span id="people" style="min-width:1ch">0</span><small>people</small></div>
+          <div class="stat-meta">Realtime headcount</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons" style="color:var(--accent-2)">flash_on</span></div>
+        <div class="stat-body">
+          <div class="stat-label">Current Usage</div>
+          <div class="stat-value"><span id="current">0.00</span><small>kW</small></div>
+          <div class="stat-meta">Instant power draw</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons">bar_chart</span></div>
+        <div class="stat-body">
+          <div class="stat-label">Total Consumption</div>
+          <div class="stat-value"><span id="total">0.00</span><small>kWh</small></div>
+          <div class="stat-meta">Accrued energy today</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons" style="color:#f59e0b">paid</span></div>
+        <div class="stat-body">
+          <div class="stat-label">Cost</div>
+          <div class="stat-value">₹<span id="cost">0.00</span><small>INR</small></div>
+          <div class="stat-meta">Estimated cost (INR)</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons" style="color:#60a5fa">thermostat</span></div>
+        <div class="stat-body">
+          <div class="stat-label">Temperature</div>
+          <div class="stat-value"><span id="temp">--</span><small>°C</small></div>
+          <div class="stat-meta">Sensor reading</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons" style="color:#34d399">water_drop</span></div>
+        <div class="stat-body">
+          <div class="stat-label">Humidity</div>
+          <div class="stat-value"><span id="hum">--</span><small>%</small></div>
+          <div class="stat-meta">Sensor reading</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons" style="color:#7dd3fc">thermostat_auto</span></div>
+        <div class="stat-body">
+          <div class="stat-label">AC</div>
+          <div class="stat-value card-controls" style="align-items:flex-start;">
+            <div style="display:flex;flex-direction:column">
+              <div style="font-size:1.25rem; font-weight:800"><span id="ac_sugg">--</span><small style="margin-left:6px">°C</small></div>
+              <div style="font-size:0.9rem; color:var(--muted); margin-top:4px">Suggestion</div>
+            </div>
+            <div style="display:flex;flex-direction:column; margin-left:12px">
+              <div style="font-size:1rem"><span style="color:#dfe9f2">Curr:</span> <span id="ac_current">--</span><small style="margin-left:6px">°C</small></div>
+              <div style="font-size:0.9rem; color:var(--muted); margin-top:4px">Setpoint</div>
+            </div>
+          </div>
+          <div class="stat-meta" id="ac_meta">Mode: Auto</div>
+        </div>
+      </div>
+
+      <!-- Voice Assistant card -->
+      <div class="stat-card" style="grid-column:auto / span 1">
+        <div class="icon"><span class="material-icons" style="color:#60a5fa">record_voice_over</span></div>
+        <div class="stat-body">
+          <div class="stat-label">Voice Assistant</div>
+          <div class="stat-value card-controls" style="align-items:center;">
+            <input id="voice_text" type="text" placeholder="Say or type a command" style="flex:1; padding:6px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:inherit">
+            <button id="voice_send" class="btn btn-increase btn-small">Send</button>
+            <button id="voice_mic" class="btn btn-decrease btn-small">Mic</button>
+          </div>
+          <div class="stat-meta" id="voice_result">Try: "set temp to 24" or "increase people"</div>
+        </div>
+      </div>
+
+      <!-- AC Override card -->
+      <div class="stat-card">
+        <div class="icon"><span class="material-icons" style="color:#f97316">tune</span></div>
+        <div class="stat-body">
+          <div class="stat-label">AC Override</div>
+          <div class="stat-value card-controls" style="align-items:center;">
+            <input id="override_value" type="number" placeholder="24" style="width:84px; padding:6px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:inherit">
+            <button id="override_apply" class="btn btn-increase btn-small">Apply</button>
+            <button id="override_clear" class="btn btn-decrease btn-small">Clear</button>
+          </div>
+          <div class="stat-meta" id="override_meta">No manual override</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- charts -->
+    <section class="charts" aria-label="Charts">
+      <div class="chart-wrap">
+        <canvas id="peopleChart" class="chart-canvas" role="img" aria-label="People count over time"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="energyChart" class="chart-canvas" role="img" aria-label="Energy usage"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="acChart" class="chart-canvas" role="img" aria-label="AC temperatures"></canvas>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // Chart contexts
+    const peopleCtx = document.getElementById('peopleChart').getContext('2d');
+    const energyCtx = document.getElementById('energyChart').getContext('2d');
+
+    // Shared defaults
+    Chart.defaults.font.family = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial';
+    Chart.defaults.color = '#dfe9f2';
+    Chart.defaults.maintainAspectRatio = false;
+
+    // People chart
+    const peopleChart = new Chart(peopleCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'People',
+          data: [],
+          borderColor: '#ff7a18',
+          backgroundColor: 'rgba(255,122,24,0.08)',
+          tension: 0.28,
+          pointRadius: 2,
+          borderWidth: 2,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            grid: { display:false },
+            ticks: { maxRotation:0 }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1 }
+          }
+        }
+      }
+    });
+
+    // Energy chart
+    const energyChart = new Chart(energyCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Current Usage (kW)',
+          data: [],
+          borderColor: '#34d399',
+          backgroundColor: 'rgba(52,211,153,0.06)',
+          tension: 0.28,
+          pointRadius: 2,
+          borderWidth: 2,
+          fill: false
+        },{
+          label: 'Total Consumption (kWh)',
+          data: [],
+          borderColor: '#9b5cff',
+          backgroundColor: 'rgba(155,92,255,0.06)',
+          tension: 0.28,
+          pointRadius: 2,
+          borderWidth: 2,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth:12 } }
+        },
+        scales: {
+          x: { grid: { display:false }, ticks: { maxRotation:0 } },
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+    // AC chart (suggestion vs current)
+    const acCtx = document.getElementById('acChart').getContext('2d');
+    const acChart = new Chart(acCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'AC Suggestion (°C)',
+          data: [],
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.06)',
+          tension: 0.2,
+          pointRadius: 1,
+          borderWidth: 2,
+          fill: false
+        },{
+          label: 'AC Current (°C)',
+          data: [],
+          borderColor: '#7dd3fc',
+          backgroundColor: 'rgba(125,211,252,0.04)',
+          tension: 0.2,
+          pointRadius: 1,
+          borderWidth: 2,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: { x: { grid: { display:false } }, y: { beginAtZero: false } }
+      }
+    });
+
+    // Helper: push and cap length
+    function pushCap(arr, v, cap=40){
+      arr.push(v);
+      if (arr.length > cap) arr.shift();
+    }
+
+    // Update UI function. Uses /data endpoint like your original.
+    async function updateData(){
+      try{
+        const response = await fetch('/data');
+        if(!response.ok) throw new Error('Network response not ok');
+        const data = await response.json();
+
+        const timeLabel = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+
+        // People chart
+        pushCap(peopleChart.data.labels, timeLabel, 40);
+        pushCap(peopleChart.data.datasets[0].data, Number(data.people_count ?? 0), 40);
+        peopleChart.update('none');
+
+        // Energy chart
+        pushCap(energyChart.data.labels, timeLabel, 40);
+        pushCap(energyChart.data.datasets[0].data, Number(data.current_usage ?? 0), 40);
+        pushCap(energyChart.data.datasets[1].data, Number(data.total_consumption ?? 0), 40);
+        energyChart.update('none');
+
+        // AC chart updates: allow null for missing values
+        try {
+          pushCap(acChart.data.labels, timeLabel, 40);
+          const sVal = (data.ac_suggestion === null || data.ac_suggestion === undefined) ? null : Number(data.ac_suggestion);
+          const cVal = (data.ac_current === null || data.ac_current === undefined) ? null : Number(data.ac_current);
+          pushCap(acChart.data.datasets[0].data, sVal, 40);
+          pushCap(acChart.data.datasets[1].data, cVal, 40);
+          acChart.update('none');
+        } catch (e) {}
+
+        // DOM values (formatting)
+        document.getElementById('people').innerText = Number(data.people_count ?? 0);
+        document.getElementById('current').innerText = (Number(data.current_usage ?? 0)).toFixed(2);
+        document.getElementById('total').innerText = (Number(data.total_consumption ?? 0)).toFixed(2);
+        document.getElementById('cost').innerText = (Number(data.cost ?? 0)).toFixed(2);
+        document.getElementById('temp').innerText = (data.temperature ?? '--');
+        document.getElementById('hum').innerText = (data.humidity ?? '--');
+        // AC values (suggestion, current setpoint, override state)
+        try {
+          document.getElementById('ac_sugg').innerText = (data.ac_suggestion ?? '--');
+          document.getElementById('ac_current').innerText = (data.ac_current ?? '--');
+          const acMeta = document.getElementById('ac_meta');
+          if (data.ac_override) {
+            acMeta.innerText = 'Mode: Manual (Override)';
+          } else {
+            acMeta.innerText = 'Mode: Auto';
+          }
+        } catch (e) {
+          // Elements may not exist in older templates; ignore
+        }
+
+        // Update override meta text (for the override card)
+        try {
+          const om = document.getElementById('override_meta');
+          if (data.ac_override) {
+            om.innerText = `Manual override active — current ${data.ac_current ?? '--'}°C`;
+          } else {
+            om.innerText = 'No manual override';
+          }
+        } catch (e) {}
+
+      } catch (err) {
+        // graceful fail: keep previous UI, log compactly
+        console.debug('updateData error', err?.message || err);
+      }
+    }
+
+    // initial fetch + poll
+    updateData();
+    const POLL_MS = 15000; // 15s
+    setInterval(updateData, POLL_MS);
+
+    // Voice assistant and override UI wiring
+    async function sendVoiceText(text) {
+      try {
+        const resp = await fetch('/voice', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({text})
+        });
+        const j = await resp.json();
+        if (j.result) {
+          document.getElementById('voice_result').innerText = j.result;
+        } else if (j.error) {
+          document.getElementById('voice_result').innerText = 'Error: ' + j.error;
+        }
+        // refresh small state after the command (to pick up AC override or people change)
+        updateData();
+      } catch (err) {
+        document.getElementById('voice_result').innerText = 'Voice request failed';
+      }
+    }
+
+    document.getElementById('voice_send')?.addEventListener('click', (e) => {
+      const t = document.getElementById('voice_text')?.value || '';
+      if (t) sendVoiceText(t);
+    });
+
+    // Microphone capture using Web Speech API (best-effort)
+    const micBtn = document.getElementById('voice_mic');
+    if (micBtn) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        micBtn.disabled = true;
+        micBtn.innerText = 'No Mic';
+      } else {
+        const recog = new SpeechRecognition();
+        recog.lang = 'en-US';
+        recog.interimResults = false;
+        recog.maxAlternatives = 1;
+        micBtn.addEventListener('click', () => {
+          document.getElementById('voice_result').innerText = 'Listening...';
+          recog.start();
+        });
+        recog.addEventListener('result', (ev) => {
+          const txt = ev.results[0][0].transcript;
+          document.getElementById('voice_text').value = txt;
+          sendVoiceText(txt);
+        });
+        recog.addEventListener('error', (ev) => {
+          document.getElementById('voice_result').innerText = 'Mic error';
+        });
+      }
+    }
+
+    // Override apply / clear
+    document.getElementById('override_apply')?.addEventListener('click', async () => {
+      const v = document.getElementById('override_value')?.value;
+      if (!v) return;
+      try {
+        const resp = await fetch('/ac/override', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({value: Number(v)})});
+        const j = await resp.json();
+        if (j.result) {
+          document.getElementById('override_meta').innerText = `Manual override active — current ${j.ac_current ?? v}°C`;
+        } else {
+          document.getElementById('override_meta').innerText = `Error: ${j.error}`;
+        }
+        updateData();
+      } catch (e) {
+        document.getElementById('override_meta').innerText = 'Override request failed';
+      }
+    });
+
+    document.getElementById('override_clear')?.addEventListener('click', async () => {
+      try {
+        const resp = await fetch('/ac/override/clear', {method:'POST'});
+        const j = await resp.json();
+        if (j.result) {
+          document.getElementById('override_meta').innerText = 'No manual override';
+        } else {
+          document.getElementById('override_meta').innerText = `Error: ${j.error}`;
+        }
+        updateData();
+      } catch (e) {
+        document.getElementById('override_meta').innerText = 'Clear request failed';
+      }
+    });
+
+    // Resize handling: ensure canvas containers don't overflow
+    const resizeObserver = new ResizeObserver(() => {
+      peopleChart.resize();
+      energyChart.resize();
+    });
+    resizeObserver.observe(document.querySelector('.charts'));
+  </script>
+</body>
+</html>
